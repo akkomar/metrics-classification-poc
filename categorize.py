@@ -1,3 +1,5 @@
+import textwrap
+
 from google import genai
 from google.genai.types import HttpOptions
 
@@ -19,21 +21,51 @@ def categorize_metric(client, metric, categories)-> str:
     """
     response = client.models.generate_content(
             model="gemini-2.0-flash-001",
-            contents=f"""
-You are given a list of Fides categories in JSON format. Each category has a "fides_key" and a "description." You are also given a single metric in JSON format. Your task is to determine the single best Fides category for that metric, based on its name and description. If multiple categories could plausibly apply, choose the one that is most specific or most directly relevant. If you cannot find a suitable category at all, return "N/A."
+            contents=textwrap.dedent(f"""
+                You are given:
+                • A JSON list of Fides categories. Each item has a "fides_key" and a "description".
+                • One or more worked examples that map a metric (with type and sensitivity) to the correct "fides_key".
+                • A new metric to classify.
 
-Return only the chosen category’s "fides_key" as plain text, with no additional commentary or explanation.
+                When deciding, look at **all** of the metric fields—name, description, metric_type, and data_sensitivity.
+                If several categories might apply, pick the most specific or directly relevant one.
+                If no category fits, output exactly     N/A
 
-Pay attention to metric type and description. For example metric of ty `event`
+                Return only the chosen category’s fides_key (no extra text).
 
-List of categories:
-{categories}
+                ────────────────────────────────────────────────────────
+                List of categories
+                {categories}
 
-Metric to classify:
-{metric}
+                Examples
+                ────────
+                Example 1
+                Metric: {{'name':'account.delete_complete',
+                        'description':'Account successfully deleted',
+                        'metric_type':'event',
+                        'data_sensitivity':['interaction']}}
+                Expected fides_key: system.operations
 
-Respond only with the fides_key of the chosen category, or "N/A" if no category fits.
-            """,
+                Example 2
+                Metric: {{'name':'login.attempt',
+                        'description':'User attempted to log in',
+                        'metric_type':'event',
+                        'data_sensitivity':['interaction']}}
+                Expected fides_key: user.authorization
+
+                Example 3
+                Metric: {{'name':'addresses.autofill_prompt_dismissed',
+                        'description':'Address autofill prompt was dismissed.',
+                        'metric_type':'event',
+                        'data_sensitivity':['interaction']}}
+                Expected fides_key: user.behavior
+
+                ────────────────────────────────────────────────────────
+                Classify this metric
+                {metric}
+
+                Respond with the single best fides_key, or “N/A”.
+            """),
         )
     return response.text.strip()
     
